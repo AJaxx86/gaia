@@ -17,6 +17,7 @@ messages = [
 	types.Content(role="user", parts=[types.Part(text=user_prompt)])
 ]
 
+vervise_logging = True if sys.argv[2] == "--verbose" else False
 
 def main():
 	response = client.models.generate_content(
@@ -24,9 +25,13 @@ def main():
 		contents=messages
 	)
 	prompt_tokens: int = response.usage_metadata.prompt_token_count
-	completion_tokens: int = response.usage_metadata.candidates_token_count
+	response_tokens: int = response.usage_metadata.candidates_token_count
 
-	print(f"{response.text}\nPrompt tokens: {prompt_tokens}\nResponse tokens: {completion_tokens}")
+	if vervise_logging == "true":
+		print(f"User prompt: {user_prompt}")
+		print(f"Prompt tokens: {prompt_tokens}")
+		print(f"Response tokens: {response_tokens}")
+	print(response.text)
 
 
 
