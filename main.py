@@ -30,7 +30,7 @@ def main():
 
 	print(f"{response.text}")
 	if verbose:
-		print(f"User prompt: {user_prompt}\nPrompt tokens: {prompt_tokens}\nResponse tokens: {completion_tokens}")
+		print(f"User prompt: {user_prompt}\nPrompt tokens: {prompt_tokens}\nResponse tokens: {response_tokens}")
 
 
 if __name__ == "__main__":
