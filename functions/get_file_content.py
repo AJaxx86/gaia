@@ -3,6 +3,7 @@ from .config import GET_FILE_CONTENT_CHAR_LIMIT as max_chars
 
 def get_file_content(working_directory, file_path) -> str:
     full_path = os.path.abspath(os.path.join(working_directory, file_path))
+    print(f'Full path: {full_path}')
 
     if not full_path.startswith(os.path.abspath(working_directory)):
         return f'Error: Cannot read "{file_path}" as it is outside the permitted working directory'
