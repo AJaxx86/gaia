@@ -12,15 +12,18 @@ from google.genai import types
 system_prompt = """
 You are a helpful AI coding agent.
 
-When a user asks a question or makes a request,  make a function call plan and immediately execute it. You can perform the following operations:
+When a user asks a question or makes a request that needs more context, make a function call plan. If you are asked to fix a bug, find the root cause and fix it. Once the prompt has been satisfied, explain what you did.
 
+You can perform the following operations:
 - List files and directories
+- Get the content of a file
+- Write to a file
+- Run a python file
 
 All paths you provide should be relative to the working directory. You do not need to specify the working directory in your function calls as it is automatically injected for security reasons.
 
 tests.py files never have arguments when running them.
 """
-
 available_functions = types.Tool(
 	function_declarations=[
 		schemas.schema_get_files_info,
@@ -29,6 +32,7 @@ available_functions = types.Tool(
 		schemas.schema_run_python_file,
 	]
 )
+max_iterations = 20
 
 if len(sys.argv) < 2:
 	print("Error: prompt not provided. Exiting GAIA...")
@@ -45,33 +49,48 @@ messages = [
 
 
 def main():
-	response = client.models.generate_content(
-		model="gemini-2.0-flash-001",
-		contents=messages,
-		config=types.GenerateContentConfig(
-			system_instruction=system_prompt,
-			tools=[available_functions]
-		)
-	)
+	iterations = 0
+	try:
+		while iterations < max_iterations:
+			response = client.models.generate_content(
+				model="gemini-2.0-flash-001",
+				contents=messages,
+				config=types.GenerateContentConfig(
+					system_instruction=system_prompt,
+					tools=[available_functions]
+				)
+			)
+			iterations += 1
+			
+			if not response.function_calls:
+				break
+			
+			for candidate in response.candidates:
+				messages.append(candidate.content)
+				if verbose:
+					print(f"Iteration {iterations}: {"<NO TEXT RESPONSE>" if not candidate.content.parts[0].text else candidate.content.parts[0].text}")
+			
+			for function_call_part in response.function_calls:
+				function_result = call_function(function_call_part, verbose)
+				function_response = function_result.parts[0].function_response.response
+				messages.append(function_result)
+
+				if not function_response:
+					raise Exception(f"Function {function_call_part.name} returned no response")
+				else:
+					print(f"-> {function_response.get('result')}")
+	
+	except Exception as e:
+		print(f"Error: {e}")
+		exit(1)
 
 	print(f"User prompt: {user_prompt}")
-
-	if response.function_calls:
-		for function_call_part in response.function_calls:
-			function_result = call_function(function_call_part, verbose)
-			function_response = function_result.parts[0].function_response.response
-
-			if not function_response:
-				raise Exception(f"Function {function_call_part.name} returned no response")
-			else:
-				print(f"-> {function_response.get('result')}")
-
-	print(f"Response: {'Called functions' if not response.text else response.text}")
+	print(f"Response: {response.text}")
 
 	if verbose:
 		prompt_tokens: int = response.usage_metadata.prompt_token_count
 		response_tokens: int = response.usage_metadata.candidates_token_count
-		print(f"Prompt tokens: {prompt_tokens}\nResponse tokens: {response_tokens}")
+		print(f"Prompt tokens: {prompt_tokens}\nResponse tokens: {response_tokens}\nIterations: {iterations}")
 
 
 def call_function(function_call: types.FunctionCall, verbose: bool = False):
